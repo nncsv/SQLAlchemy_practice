@@ -1,33 +1,17 @@
-'''
-Установить sqlalchemy и попробовать поработать на нем, создать какую-нибудь базу (например базу телефонных номеров)
-* написать консольное приложение-телефонную книгу:
-Пользователь вводит команды в консоль для управления приложением
-add <имя_контакта> <номер_телефона> - добавление контакта
-
-del <имя_контакта> - удаление контакта
-
-list <имя_контакта> - вывести информацию о контакте
-Может быть добавить поле город
-
-list (без аргументов) - вывести список всех контактов
-'''
-
-
 import re
 import sqlalchemy as db
 from sqlalchemy.orm import DeclarativeBase, Session
 from sqlalchemy.orm.exc import NoResultFound
 
-#ФУНКЦИИ
 def create_contact(arg, session):
     try:
-        if (re.search(r'\+\d[\d\s\(\)-]{6,}', arg[2])): #НЕ ВСЕ НОМЕРА ПРОВЕРЯЕТ КОРРЕКТНО!!!!!!!!!!!
-            exist = session.query(Contact).filter(db.or_(Contact.name == arg[1], Contact.number == arg[2])).one()
+        if (re.search(r'^\+\d[\d\(\)-]{2,20}$', arg[2])):
+            exist = session.query(Contact).filter(db.or_(Contact.name == arg[1].lower(), Contact.number == arg[2])).one()
             print("Похожий контакт уже существует: ", exist.name, exist.number)
         else:
             print("Номер указан неверно.")
     except NoResultFound:
-        new_contact = Contact(name=arg[1], number=arg[2])
+        new_contact = Contact(name=arg[1].lower(), number=arg[2])
         session.add(new_contact)
         session.commit()
         session.refresh(new_contact)
@@ -36,20 +20,26 @@ def create_contact(arg, session):
         print("Параметры команды введены неверно.")
 
 def delete_contact(arg, session):
-    contact = session.query(Contact).filter(Contact.name==arg[1]).first()
-    if contact:
-        session.delete(contact)
-        session.commit()
-        print("Контакт ", arg[1], " удалён.")
-    else:
-        print("Контакт с именем ", arg[1], " не найден.")
+    try:
+        contact = session.query(Contact).filter(Contact.name==arg[1].lower()).first()
+        if contact:
+            session.delete(contact)
+            session.commit()
+            print("Контакт ", arg[1], " удалён.")
+        else:
+            print("Контакт с именем ", arg[1], " не найден.")
+    except IndexError:
+        print("Параметры команды введены неверно.")
 
 def print_contact(arg, session):
-    contact = session.query(Contact).filter(Contact.name == arg[1]).first()
-    if contact:
-        print(contact.id, ": ", contact.name, " ", contact.number)
-    else:
-        print("Контакт с именем ", arg[1], " не найден.")
+    try:
+        contact = session.query(Contact).filter(Contact.name == arg[1].lower()).first()
+        if contact:
+            print(contact.id, ": ", contact.name, " ", contact.number)
+        else:
+            print("Контакт с именем ", arg[1], " не найден.")
+    except IndexError:
+        print("Параметры команды введены неверно.")
 
 def print_phone_book(session):
     for contact in session.query(Contact).all():
@@ -64,7 +54,7 @@ menu = {
     }
 
 #ПОДГОТОВКА К СЕССИИ
-engine = db.create_engine('sqlite:///Phones.db')  #попробовать не sqlite   , echo=True
+engine = db.create_engine('sqlite:///Phones.db')  #echo=True
 
 class Base(DeclarativeBase): pass
 
@@ -76,7 +66,6 @@ class Contact(Base):
 
 #создание таблиц
 Base.metadata.create_all(bind=engine)
-
 
 #НАЧАЛО СЕССИИ
 with Session(autoflush=False, bind=engine) as session:
